@@ -447,21 +447,27 @@ function snd(n){try{const a=Snd[n];if(a){a.currentTime=0;a.play()}}catch(e){}}
 
 /* ===== 読み上げシステム ===== */
 const ON_YOMI={'一':'いち','二':'に','三':'さん','四':'し','五':'ご','六':'ろく','七':'しち','八':'はち','九':'く','十':'じゅう','百':'ひゃく','千':'せん','山':'さん','川':'せん','木':'もく','森':'しん','林':'りん','水':'すい','火':'か','土':'ど','石':'せき','空':'くう','天':'てん','雨':'う','月':'げつ','日':'にち','夕':'せき','草':'そう','花':'か','竹':'ちく','田':'でん','野':'や','犬':'けん','虫':'ちゅう','貝':'ばい','目':'もく','耳':'じ','口':'こう','手':'しゅ','足':'そく','人':'じん','男':'だん','女':'じょ','子':'し','王':'おう','赤':'せき','青':'せい','白':'はく','上':'じょう','下':'か','左':'さ','右':'う','中':'ちゅう','大':'だい','小':'しょう','見':'けん','学':'がく','校':'こう','字':'じ','文':'ぶん','音':'おん','円':'えん','年':'ねん','糸':'し','車':'しゃ','金':'きん','生':'せい','先':'せん','正':'せい','早':'そう','立':'りつ','出':'しゅつ','入':'にゅう','休':'きゅう','気':'き','力':'りょく','町':'ちょう','村':'そん','谷':'こく','玉':'ぎょく','光':'こう'};
-function speakKanji(k){
+let speakTimer=null,speakDelay=0;
+function speakKanji(k,delay){
   if(!('speechSynthesis' in window))return;
+  clearTimeout(speakTimer);
   speechSynthesis.cancel();
-  const kun=k.y.split('／')[0];
-  const on=ON_YOMI[k.c];
-  const u1=new SpeechSynthesisUtterance(kun);
-  u1.lang='ja-JP';u1.rate=0.85;
-  if(on&&on!==kun){
-    u1.onend=()=>setTimeout(()=>{
-      const u2=new SpeechSynthesisUtterance(on);
-      u2.lang='ja-JP';u2.rate=0.85;
-      speechSynthesis.speak(u2);
-    },700);
-  }
-  speechSynthesis.speak(u1);
+  const d=delay!=null?delay:speakDelay;
+  speakDelay=0;
+  speakTimer=setTimeout(()=>{
+    const kun=k.y.split('／')[0];
+    const on=ON_YOMI[k.c];
+    const u1=new SpeechSynthesisUtterance(kun);
+    u1.lang='ja-JP';u1.rate=0.85;u1.volume=1.0;
+    if(on&&on!==kun){
+      u1.onend=()=>{speakTimer=setTimeout(()=>{
+        const u2=new SpeechSynthesisUtterance(on);
+        u2.lang='ja-JP';u2.rate=0.85;u2.volume=1.0;
+        speechSynthesis.speak(u2);
+      },700);};
+    }
+    speechSynthesis.speak(u1);
+  },d);
 }
 
 
@@ -525,6 +531,7 @@ function toggleLearned(i){
   if(learned.has(i)){learned.delete(i);render(i);}
   else{
     learned.add(i);
+    speakDelay=1000;
     const{start}=getChapterRange();
     if(getChapterLearned()>=getVisibleIndices().length+1){updateProgress();return;}
     if(restudyMode){
@@ -643,7 +650,6 @@ function checkAns(btn,sel,cor){
   const r=document.getElementById('quizResult');
   if(sel===cor){
     qOk++;btn.classList.add('correct');r.textContent='⭕ せいかい！';r.style.color='#15803d';snd('correct');
-    setTimeout(()=>speakKanji(K[qKanjiIdx]),400);
     const mk=document.createElement('span');mk.className='opt-mark-c';mk.textContent='⭕';mk.style.color='#4ade80';btn.appendChild(mk);
     setTimeout(()=>setupQuiz(),1500);
   }else{
