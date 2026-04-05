@@ -88,6 +88,7 @@
   .progress-fill{height:100%;background:linear-gradient(90deg,#4ade80,#fbbf24,#f97316);border-radius:6px;transition:width .5s ease-out}
   .progress-car{position:absolute;top:-26px;left:0;font-size:1.6rem;transition:left .5s ease-out;transform:scaleX(-1);filter:drop-shadow(0 1px 2px rgba(0,0,0,.15));z-index:2}
   .progress-flag{position:absolute;top:-24px;right:-30px;font-size:1.4rem;z-index:1}
+  @keyframes levelUp{0%{filter:drop-shadow(0 1px 2px rgba(0,0,0,.15))}40%{filter:drop-shadow(0 0 10px gold) drop-shadow(0 0 20px gold) brightness(1.4)}100%{filter:drop-shadow(0 1px 2px rgba(0,0,0,.15))}}
   .mode-btns{display:flex;gap:6px}
   .mode-btn{padding:6px 16px;border-radius:20px;border:2px solid #e9ecef;background:#fff;font-family:inherit;font-size:.85rem;font-weight:700;cursor:pointer;transition:all .3s;color:#495057}
   .mode-btn.active{border-color:#ff6b6b;background:#ff6b6b;color:#fff}
@@ -287,7 +288,7 @@
   </div>
   <div class="chapter-stamps" id="chapterStamps"></div>
   <div class="top-bar">
-    <div class="progress"><span id="progressText">0 / 80</span><div class="progress-track"><span class="progress-car" id="progressCar">🚗</span><span class="progress-flag">🏁</span><div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div></div></div>
+    <div class="progress"><span id="progressText">0 / 80</span><div class="progress-track"><span class="progress-car" id="progressCar">🚶</span><span class="progress-flag">🏁</span><div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div></div></div>
     <div class="mode-btns">
       <button class="mode-btn active" id="btnStudy" onclick="switchMode('study')">学習</button>
       <button class="mode-btn" id="btnQuiz" onclick="switchMode('quiz')">クイズ</button>
@@ -424,8 +425,9 @@ const K=[
 {c:'光',y:'ひかり',m:'ひかり',s:'s-sun',cl:'#d97706',sh:'light',o:'人が火を持って明るくする様子。下の「儿」が人がひざまずく形！',d:[{e:'💡',s:'top:20px;right:25px'},{e:'✨',s:'top:30px;left:30px'}]}
 ];
 
-let ci=0,learned=new Set(),qOk=0,qAll=0,qDone=false,mode='study',restudyMode=false,qKanjiIdx=0;
+let ci=0,learned=new Set(),qOk=0,qAll=0,qDone=false,mode='study',restudyMode=false,qKanjiIdx=0,qQueue=[],qQueuePos=0,chapterQuizMode=false;
 const CHAPTER_SIZE=10,TOTAL_CHAPTERS=Math.ceil(K.length/CHAPTER_SIZE);
+const CHAPTER_VEHICLE=['🚶','🚲','🏍️','🚗','🚛','🚌','🏎️','🚂','🚃','🚄','🚁','✈️','🚀','🛸'];
 let currentChapter=0,completedChapters=new Set();
 function getChapterRange(ch){ch=ch??currentChapter;const s=ch*CHAPTER_SIZE;return{start:s,end:Math.min(s+CHAPTER_SIZE-1,K.length-1)};}
 function getChapterLearned(ch){const{start,end}=getChapterRange(ch);return Array.from({length:end-start+1},(_,i)=>start+i).filter(i=>learned.has(i)).length;}
@@ -533,7 +535,7 @@ function toggleLearned(i){
     learned.add(i);
     speakDelay=1000;
     const{start}=getChapterRange();
-    if(getChapterLearned()>=getVisibleIndices().length+1){updateProgress();return;}
+    if(restudyMode&&getVisibleIndices().length===0){updateProgress();return;}
     if(restudyMode){
       buildGrid();
       const vis=getVisibleIndices();
@@ -548,7 +550,7 @@ function toggleLearned(i){
 }
 
 function backToStudy(){
-  celebrated=false;
+  chapterQuizMode=false;celebrated=false;
   document.getElementById('mainArea').innerHTML='<div class="scene" id="scene"></div><div class="char-info" id="charInfo"></div>';
   const{start,end}=getChapterRange();
   const chapterIndices=Array.from({length:end-start+1},(_,i)=>start+i);
@@ -567,7 +569,7 @@ function showChapterCelebration(){
   const isLast=currentChapter===TOTAL_CHAPTERS-1;
   if(isLast){showGrandCelebration();return;}
   const main=document.getElementById('mainArea');
-  main.innerHTML=`<div style="height:160px" class="scene s-gold"></div><div style="padding:24px;text-align:center"><div class="celebration"><div class="emojis">⭐🏁⭐</div><div class="big-text">チャプター${currentChapter+1}クリア！</div><div class="sub-text">10文字全部おぼえた！<br>スタンプをゲット！</div><div style="display:flex;gap:10px;justify-content:center;margin-top:16px;flex-wrap:wrap"><button class="back-btn" onclick="goNextChapter()" style="font-size:.95rem;padding:10px 24px;border-color:#ff6b6b;color:#ff6b6b">次のチャプターへ →</button></div></div></div>`;
+  main.innerHTML=`<div style="height:160px" class="scene s-gold"></div><div style="padding:24px;text-align:center"><div class="celebration"><div class="emojis">⭐🏁⭐</div><div class="big-text">チャプター${currentChapter+1}クリア！</div><div class="sub-text">10文字全部おぼえた！<br>クイズで腕試し！全問正解で次へ進もう！</div><div style="display:flex;gap:10px;justify-content:center;margin-top:16px;flex-wrap:wrap"><button class="back-btn" onclick="startChapterQuiz()" style="font-size:.95rem;padding:10px 24px;border-color:#ff6b6b;color:#ff6b6b">クイズに挑戦！</button></div></div></div>`;
 }
 function showGrandCelebration(){
   const main=document.getElementById('mainArea');
@@ -595,7 +597,15 @@ function updateProgress(){
   const track=document.querySelector('.progress-bar');
   if(track){
     const barW=track.offsetWidth;
-    document.getElementById('progressCar').style.left=`${Math.max(0,pct*barW-12)}px`;
+    const carEl=document.getElementById('progressCar');
+    carEl.style.left=`${Math.max(0,pct*barW-12)}px`;
+    const newV=CHAPTER_VEHICLE[currentChapter]||'🚶';
+    if(carEl.textContent!==newV){
+      carEl.textContent=newV;
+      carEl.style.animation='none';
+      void carEl.offsetHeight;
+      carEl.style.animation='levelUp .8s ease forwards';
+    }
   }
   document.querySelectorAll('.char-thumb').forEach(t=>{
     t.style.background=learned.has(parseInt(t.dataset.idx))?'#dcfce7':'#f8f9fa';
@@ -610,31 +620,59 @@ function updateQuizBtn(){
   document.getElementById('btnQuiz').disabled=learned.size<2;
 }
 
+function startChapterQuiz(){
+  chapterQuizMode=true;
+  const{start,end}=getChapterRange();
+  const chIdx=Array.from({length:end-start+1},(_,i)=>start+i).filter(i=>learned.has(i));
+  qOk=0;qAll=0;qQueue=[...chIdx].sort(()=>Math.random()-0.5);qQueuePos=0;
+  mode='quiz';
+  document.getElementById('studyArea').classList.remove('show');
+  document.getElementById('quizArea').classList.add('show');
+  document.getElementById('btnStudy').classList.remove('active');
+  document.getElementById('btnQuiz').classList.add('active');
+  const qc=document.getElementById('quizContent');
+  qc.innerHTML=`<h2>チャプター${currentChapter+1} クイズ！</h2><p style="color:#868e96;margin-bottom:14px;font-size:.85rem">全問正解で次のチャプターへ進めます（${chIdx.length}問）</p><div class="quiz-question" id="quizKanji"></div><div class="quiz-options" id="quizOptions"></div><div class="quiz-result" id="quizResult"></div><div class="quiz-score" id="quizScore"></div>`;
+  setupQuiz();
+}
 function switchMode(m){
   mode=m;
   document.getElementById('studyArea').classList.toggle('show',m==='study');
   document.getElementById('quizArea').classList.toggle('show',m==='quiz');
   document.getElementById('btnStudy').classList.toggle('active',m==='study');
   document.getElementById('btnQuiz').classList.toggle('active',m==='quiz');
-  if(m==='quiz')showQuiz();
+  if(m==='quiz'&&!chapterQuizMode)showQuiz();
 }
 
 function showQuiz(){
+  chapterQuizMode=false;
   const qc=document.getElementById('quizContent');
   if(learned.size<2){
     qc.innerHTML=`<div class="quiz-empty"><p>まだクイズを出せません</p><p>2文字以上「おぼえた！」を押してください</p><p style="font-size:.8rem">現在 ${learned.size} / ${K.length} 文字おぼえました</p><button class="back-btn" onclick="backToStudy()">学習に戻る</button></div>`;
     return;
   }
-  qOk=0;qAll=0;
+  qOk=0;qAll=0;qQueue=[...learned].sort(()=>Math.random()-0.5);qQueuePos=0;
   qc.innerHTML=`<h2>クイズタイム！</h2><p style="color:#868e96;margin-bottom:14px;font-size:.85rem">おぼえた漢字の読み方はなんでしょう？（${learned.size}文字から出題）</p><div class="quiz-question" id="quizKanji"></div><div class="quiz-options" id="quizOptions"></div><div class="quiz-result" id="quizResult"></div><div class="quiz-score" id="quizScore"></div><button class="back-btn" onclick="backToStudy()">学習に戻る</button>`;
   setupQuiz();
 }
 
+function showQuizEnd(){
+  const qc=document.getElementById('quizContent');
+  const perfect=qOk===qAll;
+  if(chapterQuizMode){
+    chapterQuizMode=false;
+    if(perfect){
+      qc.innerHTML=`<div style="text-align:center;padding:20px"><div style="font-size:3rem;margin-bottom:16px">🎉</div><h2>全問正解！</h2><p style="color:#15803d;margin:12px 0;font-weight:700">すごい！次のチャプターへ進もう！</p><button class="back-btn" onclick="goNextChapter()" style="border-color:#ff6b6b;color:#ff6b6b;font-size:.95rem;padding:10px 24px">次のチャプターへ →</button></div>`;
+    }else{
+      qc.innerHTML=`<div style="text-align:center;padding:20px"><div style="font-size:3rem;margin-bottom:16px">📝</div><h2>${qAll}問中 ${qOk}問 せいかい</h2><p style="color:#868e96;margin:12px 0">全問正解で次のチャプターへ進めます。<br>もう一度チャレンジしよう！</p><button class="back-btn" onclick="startChapterQuiz()" style="border-color:#ff6b6b;color:#ff6b6b">もう一度クイズ</button>&nbsp;<button class="back-btn" onclick="backToStudy()">学習に戻る</button></div>`;
+    }
+  }else{
+    qc.innerHTML=`<div style="text-align:center;padding:20px"><div style="font-size:3rem;margin-bottom:16px">${perfect?'🎉':'📝'}</div><h2>${qAll}問中 ${qOk}問 せいかい！</h2><p style="color:#868e96;margin:12px 0">${perfect?'すごい！全問正解！':'もう一度チャレンジしてみよう！'}</p><button class="back-btn" onclick="showQuiz()">もう一度</button>&nbsp;<button class="back-btn" onclick="backToStudy()">学習に戻る</button></div>`;
+  }
+}
 function setupQuiz(){
-  if(learned.size<2){showQuiz();return;}
+  if(qQueuePos>=qQueue.length){showQuizEnd();return;}
   qDone=false;
-  const arr=[...learned];
-  const ci2=arr[Math.floor(Math.random()*arr.length)],c=K[ci2];
+  const ci2=qQueue[qQueuePos++],c=K[ci2];
   qKanjiIdx=ci2;
   document.getElementById('quizKanji').textContent=c.c;
   let opts=[c];
@@ -658,9 +696,8 @@ function checkAns(btn,sel,cor){
     document.querySelectorAll('.quiz-option').forEach(b=>{
       if(b.textContent.trim()===cor){b.classList.add('zoom-answer');}
     });
-    const qi=[...learned].find(i=>K[i].c===document.getElementById('quizKanji').textContent);
-    if(qi!==undefined){learned.delete(qi);updateProgress();}
-    setTimeout(()=>{if(learned.size>=2)setupQuiz();else showQuiz();},3000);
+    if(!chapterQuizMode){const qi=[...learned].find(i=>K[i].c===document.getElementById('quizKanji').textContent);if(qi!==undefined){learned.delete(qi);updateProgress();}}
+    setTimeout(()=>setupQuiz(),3000);
   }
   document.getElementById('quizScore').textContent=`${qAll}問中 ${qOk}問 せいかい！`;
 }
