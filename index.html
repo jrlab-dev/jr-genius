@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>かんじもん — 小学1年生の漢字キャラクター</title>
+<title>かんじモン — 小学1年生の漢字キャラクター</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;700;900&display=swap');
   *{margin:0;padding:0;box-sizing:border-box}
@@ -93,6 +93,12 @@
   .mode-btn.active{border-color:#ff6b6b;background:#ff6b6b;color:#fff}
   .mode-btn:hover{border-color:#ff6b6b}
   .mode-btn:disabled{opacity:.4;cursor:default;border-color:#e9ecef;background:#fff;color:#adb5bd}
+
+  .chapter-stamps{display:flex;gap:6px;justify-content:center;margin-bottom:10px;flex-wrap:wrap}
+  .stamp{width:38px;height:38px;border-radius:50%;border:2px solid #e9ecef;display:flex;align-items:center;justify-content:center;font-size:.8rem;font-weight:700;cursor:pointer;transition:all .3s;background:#f8f9fa;color:#adb5bd}
+  .stamp.done{background:linear-gradient(135deg,#fbbf24,#f59e0b);border-color:#d97706;color:#fff;box-shadow:0 2px 8px rgba(249,115,22,.3)}
+  .stamp.current{border-color:#ff6b6b;background:#fff5f5;color:#ff6b6b}
+  .stamp:hover{transform:scale(1.1)}
 
   .main-area{background:#fff;border-radius:20px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,.08);margin-bottom:16px}
   .main-area .scene{height:300px}
@@ -270,7 +276,7 @@
 </head>
 <body>
 <header>
-  <h1>かんじもん</h1>
+  <h1>かんじモン</h1>
   <p>小学1年生の漢字 80字 — 見て覚える！</p>
 </header>
 <div class="container">
@@ -279,6 +285,7 @@
     <button class="grade-tab" style="opacity:.5;cursor:default">小学2年生（近日公開）</button>
     <button class="grade-tab" style="opacity:.5;cursor:default">小学3年生（近日公開）</button>
   </div>
+  <div class="chapter-stamps" id="chapterStamps"></div>
   <div class="top-bar">
     <div class="progress"><span id="progressText">0 / 80</span><div class="progress-track"><span class="progress-car" id="progressCar">🚗</span><span class="progress-flag">🏁</span><div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div></div></div>
     <div class="mode-btns">
@@ -417,7 +424,13 @@ const K=[
 {c:'光',y:'ひかり',m:'ひかり',s:'s-sun',cl:'#d97706',sh:'light',o:'人が火を持って明るくする様子。下の「儿」が人がひざまずく形！',d:[{e:'💡',s:'top:20px;right:25px'},{e:'✨',s:'top:30px;left:30px'}]}
 ];
 
-let ci=0,learned=new Set(),qOk=0,qAll=0,qDone=false,mode='study',restudyMode=false;
+let ci=0,learned=new Set(),qOk=0,qAll=0,qDone=false,mode='study',restudyMode=false,qKanjiIdx=0;
+const CHAPTER_SIZE=10,TOTAL_CHAPTERS=Math.ceil(K.length/CHAPTER_SIZE);
+let currentChapter=0,completedChapters=new Set();
+function getChapterRange(ch){ch=ch??currentChapter;const s=ch*CHAPTER_SIZE;return{start:s,end:Math.min(s+CHAPTER_SIZE-1,K.length-1)};}
+function getChapterLearned(ch){const{start,end}=getChapterRange(ch);return Array.from({length:end-start+1},(_,i)=>start+i).filter(i=>learned.has(i)).length;}
+function buildChapterStamps(){const el=document.getElementById('chapterStamps');if(!el)return;el.innerHTML=Array.from({length:TOTAL_CHAPTERS},(_,i)=>{const cls=completedChapters.has(i)?'done':(i===currentChapter?'current':'');const lbl=completedChapters.has(i)?'⭐':`${i+1}`;return`<div class="stamp ${cls}" onclick="switchChapter(${i})" title="チャプター${i+1}">${lbl}</div>`;}).join('');}
+function switchChapter(ch){if(ch===currentChapter)return;currentChapter=ch;celebrated=completedChapters.has(ch);restudyMode=false;document.getElementById('mainArea').innerHTML='<div class="scene" id="scene"></div><div class="char-info" id="charInfo"></div>';buildGrid();buildChapterStamps();switchMode('study');render(getChapterRange().start);}
 
 /* ===== 音声システム ===== */
 const Snd={
@@ -432,6 +445,26 @@ const Snd={
 };
 function snd(n){try{const a=Snd[n];if(a){a.currentTime=0;a.play()}}catch(e){}}
 
+/* ===== 読み上げシステム ===== */
+const ON_YOMI={'一':'いち','二':'に','三':'さん','四':'し','五':'ご','六':'ろく','七':'しち','八':'はち','九':'く','十':'じゅう','百':'ひゃく','千':'せん','山':'さん','川':'せん','木':'もく','森':'しん','林':'りん','水':'すい','火':'か','土':'ど','石':'せき','空':'くう','天':'てん','雨':'う','月':'げつ','日':'にち','夕':'せき','草':'そう','花':'か','竹':'ちく','田':'でん','野':'や','犬':'けん','虫':'ちゅう','貝':'ばい','目':'もく','耳':'じ','口':'こう','手':'しゅ','足':'そく','人':'じん','男':'だん','女':'じょ','子':'し','王':'おう','赤':'せき','青':'せい','白':'はく','上':'じょう','下':'か','左':'さ','右':'う','中':'ちゅう','大':'だい','小':'しょう','見':'けん','学':'がく','校':'こう','字':'じ','文':'ぶん','音':'おん','円':'えん','年':'ねん','糸':'し','車':'しゃ','金':'きん','生':'せい','先':'せん','正':'せい','早':'そう','立':'りつ','出':'しゅつ','入':'にゅう','休':'きゅう','気':'き','力':'りょく','町':'ちょう','村':'そん','谷':'こく','玉':'ぎょく','光':'こう'};
+function speakKanji(k){
+  if(!('speechSynthesis' in window))return;
+  speechSynthesis.cancel();
+  const kun=k.y.split('／')[0];
+  const on=ON_YOMI[k.c];
+  const u1=new SpeechSynthesisUtterance(kun);
+  u1.lang='ja-JP';u1.rate=0.85;
+  if(on&&on!==kun){
+    u1.onend=()=>setTimeout(()=>{
+      const u2=new SpeechSynthesisUtterance(on);
+      u2.lang='ja-JP';u2.rate=0.85;
+      speechSynthesis.speak(u2);
+    },700);
+  }
+  speechSynthesis.speak(u1);
+}
+
+
 function toHira(t){
   const w={'数字':'すうじ','象形文字':'ぞうけいもじ','象形':'ぞうけい','文字':'もじ','子ども':'こども','建物':'たてもの','文身':'いれずみ','交差':'こうさ','金属':'きんぞく','植物':'しょくぶつ','地面':'じめん','穀物':'こくもつ','作業':'さぎょう','道具':'どうぐ','模様':'もよう','様子':'ようす',' abbreviatio':'略称'};
   for(const[k,v]of Object.entries(w))t=t.replace(k,v);
@@ -440,8 +473,10 @@ function toHira(t){
 }
 
 function getVisibleIndices(){
-  if(restudyMode)return K.map((_,i)=>i).filter(i=>!learned.has(i));
-  return K.map((_,i)=>i);
+  const{start,end}=getChapterRange();
+  const all=Array.from({length:end-start+1},(_,i)=>start+i);
+  if(restudyMode)return all.filter(i=>!learned.has(i));
+  return all;
 }
 function buildGrid(){
   const vis=getVisibleIndices();
@@ -450,7 +485,9 @@ function buildGrid(){
 }
 function init(){
   restudyMode=false;
+  currentChapter=0;
   buildGrid();
+  buildChapterStamps();
   render(0);
 }
 
@@ -469,12 +506,13 @@ function render(i){
   }
   const txtColor=k.cl;
   const txtShadow=hasShape?'0 0 8px rgba(255,255,255,0.9),2px 2px 4px rgba(0,0,0,0.2)':'3px 3px 0 rgba(0,0,0,0.08)';
-  sc.innerHTML=`${dh}${shapeHTML}<div class="char-display" style="color:${txtColor};text-shadow:${txtShadow}" onclick="bounce(this)">${k.c}</div><div class="eyes"><div class="eye"></div><div class="eye"></div></div><div class="mouth"></div>`;
+  sc.innerHTML=`${dh}${shapeHTML}<div class="char-display" style="color:${txtColor};text-shadow:${txtShadow}" onclick="bounce(this);speakKanji(K[${i}])">${k.c}</div><div class="eyes"><div class="eye"></div><div class="eye"></div></div><div class="mouth"></div>`;
   const isL=learned.has(i);
   inf.innerHTML=`<div class="char-yomi">「${k.y}」</div><div class="char-meaning">${k.m}</div><div class="char-origin">${toHira(k.o)}</div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="learned-btn ${isL?'done':''}" onclick="snd('learned');toggleLearned(${i})">${isL?'✅ おぼえた！':'おぼえた！'}</button><button class="edit-shape-btn" onclick="snd('click');openEditor(${i})">✏️ 形を編集</button></div>`;
   document.querySelectorAll('.char-thumb').forEach(t=>t.classList.toggle('active',parseInt(t.dataset.idx)===i));
   updateProgress();
   document.getElementById('mainArea').scrollIntoView({behavior:'smooth',block:'nearest'});
+  speakKanji(k);
 }
 
 function bounce(el){el.style.transition='transform .15s';el.style.transform='scale(1.2) rotate(5deg)';setTimeout(()=>{el.style.transform='scale(1) rotate(0deg)';},150);}
@@ -487,13 +525,17 @@ function toggleLearned(i){
   if(learned.has(i)){learned.delete(i);render(i);}
   else{
     learned.add(i);
-    if(learned.size>=K.length){updateProgress();return;}
+    const{start}=getChapterRange();
+    if(getChapterLearned()>=getVisibleIndices().length+1){updateProgress();return;}
     if(restudyMode){
       buildGrid();
       const vis=getVisibleIndices();
-      if(vis.length===0){restudyMode=false;buildGrid();render(0);}
+      if(vis.length===0){restudyMode=false;buildGrid();render(start);}
       else{render(vis[(vis.indexOf(ci)+1)%vis.length]);}
-    }else{render((ci+1)%K.length);}
+    }else{
+      const vis=getVisibleIndices();
+      render(vis[(vis.indexOf(ci)+1)%vis.length]);
+    }
   }
   updateProgress();
 }
@@ -501,35 +543,60 @@ function toggleLearned(i){
 function backToStudy(){
   celebrated=false;
   document.getElementById('mainArea').innerHTML='<div class="scene" id="scene"></div><div class="char-info" id="charInfo"></div>';
-  const unlearned=K.map((_,i)=>i).filter(i=>!learned.has(i));
-  restudyMode=unlearned.length>0&&unlearned.length<K.length;
+  const{start,end}=getChapterRange();
+  const chapterIndices=Array.from({length:end-start+1},(_,i)=>start+i);
+  const unlearned=chapterIndices.filter(i=>!learned.has(i));
+  restudyMode=unlearned.length>0&&unlearned.length<chapterIndices.length;
   buildGrid();
   switchMode('study');
-  render(restudyMode?unlearned[0]:0);
+  render(restudyMode?unlearned[0]:start);
 }
 
-function showCelebration(){
+function showCelebration(){showChapterCelebration();}
+function showChapterCelebration(){
+  snd('complete');
+  completedChapters.add(currentChapter);
+  buildChapterStamps();
+  const isLast=currentChapter===TOTAL_CHAPTERS-1;
+  if(isLast){showGrandCelebration();return;}
   const main=document.getElementById('mainArea');
-  main.innerHTML=`<div style="height:200px" class="scene s-gold"></div><div style="padding:24px;text-align:center"><div class="celebration"><div class="emojis">🎉🏆🎊</div><div class="big-text">ゴールだね！</div><div class="sub-text">全${K.length}文字おぼえた！すごい！</div><div style="display:flex;gap:10px;justify-content:center;margin-top:16px;flex-wrap:wrap"><button class="back-btn" onclick="backToStudy()" style="font-size:.95rem;padding:10px 24px">もう一度学習する</button><button class="back-btn" onclick="switchMode('quiz')" style="font-size:.95rem;padding:10px 24px;border-color:#4ade80;color:#15803d">クイズスタート！</button></div></div></div>`;
+  main.innerHTML=`<div style="height:160px" class="scene s-gold"></div><div style="padding:24px;text-align:center"><div class="celebration"><div class="emojis">⭐🏁⭐</div><div class="big-text">チャプター${currentChapter+1}クリア！</div><div class="sub-text">10文字全部おぼえた！<br>スタンプをゲット！</div><div style="display:flex;gap:10px;justify-content:center;margin-top:16px;flex-wrap:wrap"><button class="back-btn" onclick="goNextChapter()" style="font-size:.95rem;padding:10px 24px;border-color:#ff6b6b;color:#ff6b6b">次のチャプターへ →</button></div></div></div>`;
+}
+function showGrandCelebration(){
+  const main=document.getElementById('mainArea');
+  main.innerHTML=`<div style="height:200px" class="scene s-gold"></div><div style="padding:24px;text-align:center"><div class="celebration"><div class="emojis">🎉🏆🎊</div><div class="big-text">ほんとうのゴール！</div><div class="sub-text">全${K.length}文字おぼえた！天才！</div><div style="margin:12px 0;font-size:2rem">⭐⭐⭐⭐⭐⭐⭐⭐</div><div style="display:flex;gap:10px;justify-content:center;margin-top:16px;flex-wrap:wrap"><button class="back-btn" onclick="backToStudy()" style="font-size:.95rem;padding:10px 24px">もう一度学習する</button><button class="back-btn" onclick="switchMode('quiz')" style="font-size:.95rem;padding:10px 24px;border-color:#4ade80;color:#15803d">クイズスタート！</button></div></div></div>`;
+}
+function goNextChapter(){
+  celebrated=false;
+  currentChapter++;
+  restudyMode=false;
+  document.getElementById('mainArea').innerHTML='<div class="scene" id="scene"></div><div class="char-info" id="charInfo"></div>';
+  buildGrid();
+  buildChapterStamps();
+  render(getChapterRange().start);
 }
 
 let celebrated=false;
 
 function updateProgress(){
-  const n=learned.size,pct=n/K.length;
-  document.getElementById('progressText').textContent=`${n} / ${K.length}`;
+  const{start,end}=getChapterRange();
+  const chSize=end-start+1;
+  const chLearned=getChapterLearned();
+  const pct=chLearned/chSize;
+  document.getElementById('progressText').textContent=`${chLearned} / ${chSize}`;
   document.getElementById('progressFill').style.width=`${(pct*100).toFixed(1)}%`;
   const track=document.querySelector('.progress-bar');
   if(track){
     const barW=track.offsetWidth;
-    document.getElementById('progressCar').style.left=`${Math.max(0, pct*barW-12)}px`;
+    document.getElementById('progressCar').style.left=`${Math.max(0,pct*barW-12)}px`;
   }
   document.querySelectorAll('.char-thumb').forEach(t=>{
     t.style.background=learned.has(parseInt(t.dataset.idx))?'#dcfce7':'#f8f9fa';
   });
+  buildChapterStamps();
   updateQuizBtn();
-  if(n===K.length&&!celebrated){celebrated=true;showCelebration();}
-  if(n<K.length)celebrated=false;
+  if(chLearned===chSize&&!celebrated){celebrated=true;showCelebration();}
+  if(chLearned<chSize)celebrated=false;
 }
 
 function updateQuizBtn(){
@@ -561,6 +628,7 @@ function setupQuiz(){
   qDone=false;
   const arr=[...learned];
   const ci2=arr[Math.floor(Math.random()*arr.length)],c=K[ci2];
+  qKanjiIdx=ci2;
   document.getElementById('quizKanji').textContent=c.c;
   let opts=[c];
   while(opts.length<4){const r=K[Math.floor(Math.random()*K.length)];if(!opts.find(o=>o.c===r.c))opts.push(r);}
@@ -575,6 +643,7 @@ function checkAns(btn,sel,cor){
   const r=document.getElementById('quizResult');
   if(sel===cor){
     qOk++;btn.classList.add('correct');r.textContent='⭕ せいかい！';r.style.color='#15803d';snd('correct');
+    setTimeout(()=>speakKanji(K[qKanjiIdx]),400);
     const mk=document.createElement('span');mk.className='opt-mark-c';mk.textContent='⭕';mk.style.color='#4ade80';btn.appendChild(mk);
     setTimeout(()=>setupQuiz(),1500);
   }else{
